@@ -1,6 +1,7 @@
 import { useState, useEffect, useCallback } from 'react';
 import * as authApi from '../api/auth';
 import { getJwt, setJwt, setUserId, clearAuth, getUserId } from '../utils/storage';
+import type { RegisterResponse } from '../types/auth';
 
 export interface UseAuthReturn {
   isAuthenticated: boolean;
@@ -8,7 +9,7 @@ export interface UseAuthReturn {
   loading: boolean;
   error: string | null;
   login: (email: string, password: string) => Promise<void>;
-  register: (email: string, password: string) => Promise<void>;
+  register: (email: string, password: string) => Promise<RegisterResponse>;
   logout: () => Promise<void>;
   clearError: () => void;
   checkAuth: () => Promise<void>;
@@ -54,7 +55,14 @@ export function useAuth(): UseAuthReturn {
     setError(null);
     setLoading(true);
     try {
-      await authApi.register(email, password);
+      const res = await authApi.register(email, password);
+      if (res.access_token) {
+        await setJwt(res.access_token);
+        await setUserId(res.user_id);
+        setIsAuthenticated(true);
+        setUserIdState(res.user_id);
+      }
+      return res;
     } catch (e: unknown) {
       const msg = e instanceof Error ? e.message : 'Error al registrar';
       setError(msg);
