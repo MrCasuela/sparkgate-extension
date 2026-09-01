@@ -35,6 +35,16 @@ export function Navigator({ onLogout }: NavigatorProps) {
         </div>
       </div>
 
+      {/* Admin panel entry point */}
+      <div className="mx-4 mt-3">
+        <button
+          onClick={() => chrome.tabs.create({ url: chrome.runtime.getURL('dashboard.html') })}
+          className="w-full rounded-lg border border-primary/30 py-2 text-xs font-medium text-primary hover:bg-primary/10 dark:text-white"
+        >
+          Panel de administración
+        </button>
+      </div>
+
       {/* Tabs */}
       <div className="mx-4 mt-3 flex rounded-lg bg-gray-100 p-1 dark:bg-gray-800">
         <button
