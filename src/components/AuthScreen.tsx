@@ -3,8 +3,11 @@ import { useTheme } from '../hooks/useTheme';
 import { LoadingSpinner } from './LoadingSpinner';
 import { ErrorAlert } from './ErrorAlert';
 import type { UseAuthReturn } from '../hooks/useAuth';
+import { ApiError } from '../api/client';
 
 type Tab = 'login' | 'register';
+
+const EMAIL_RE = /^[^@\s]+@[^@\s]+\.[^@\s]+$/;
 
 interface AuthScreenProps {
   login: UseAuthReturn['login'];
@@ -27,6 +30,8 @@ export function AuthScreen({
   const [password, setPassword] = useState('');
   const [confirmPassword, setConfirmPassword] = useState('');
   const [registerSuccess, setRegisterSuccess] = useState(false);
+  const [emailFormatError, setEmailFormatError] = useState<string | null>(null);
+  const [infoMessage, setInfoMessage] = useState<string | null>(null);
 
   const handleLogin = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -41,19 +46,37 @@ export function AuthScreen({
   const handleRegister = async (e: React.FormEvent) => {
     e.preventDefault();
     clearError();
+    setInfoMessage(null);
+
+    if (!EMAIL_RE.test(email)) {
+      setEmailFormatError('Formato de correo electrónico inválido');
+      return;
+    }
+    setEmailFormatError(null);
+
     if (password !== confirmPassword) {
-      // Use a temporary error display
       return;
     }
     try {
-      await register(email, password);
+      const res = await register(email, password);
+      if (res.access_token) {
+        // Auto-login: App will switch to the main panel now that isAuthenticated is true.
+        return;
+      }
       setRegisterSuccess(true);
       setTab('login');
       setEmail('');
       setPassword('');
       setConfirmPassword('');
-    } catch {
-      // error state handled by hook
+    } catch (e: unknown) {
+      if (e instanceof ApiError && e.status === 409) {
+        clearError();
+        setInfoMessage(e.detail);
+        setTab('login');
+        setPassword('');
+        setConfirmPassword('');
+      }
+      // other errors handled by hook via `error`
     }
   };
 
@@ -88,7 +111,7 @@ export function AuthScreen({
       {/* Tabs */}
       <div className="mx-4 mt-4 flex rounded-lg bg-gray-100 p-1 dark:bg-gray-800">
         <button
-          onClick={() => { setTab('login'); clearError(); }}
+          onClick={() => { setTab('login'); clearError(); setInfoMessage(null); setEmailFormatError(null); }}
           className={`flex-1 rounded-md py-2 text-sm font-medium transition-colors ${
             tab === 'login'
               ? 'bg-white text-primary shadow-sm dark:bg-gray-700 dark:text-white'
@@ -98,7 +121,7 @@ export function AuthScreen({
           Iniciar Sesión
         </button>
         <button
-          onClick={() => { setTab('register'); clearError(); }}
+          onClick={() => { setTab('register'); clearError(); setInfoMessage(null); setEmailFormatError(null); }}
           className={`flex-1 rounded-md py-2 text-sm font-medium transition-colors ${
             tab === 'register'
               ? 'bg-white text-primary shadow-sm dark:bg-gray-700 dark:text-white'
@@ -120,16 +143,27 @@ export function AuthScreen({
           </div>
         )}
 
+        {infoMessage && (
+          <div className="rounded-lg bg-primary/10 p-3 text-sm text-primary dark:text-white">
+            {infoMessage}
+          </div>
+        )}
+
         {error && <ErrorAlert message={error} onDismiss={clearError} />}
 
-        <input
-          type="email"
-          placeholder="Correo electrónico"
-          value={email}
-          onChange={(e) => setEmail(e.target.value)}
-          required
-          className="rounded-lg border border-gray-300 bg-white px-3 py-2 text-sm text-text outline-none focus:border-primary dark:border-gray-600 dark:bg-gray-800 dark:text-darkText"
-        />
+        <div className="flex flex-col gap-1">
+          <input
+            type="email"
+            placeholder="Correo electrónico"
+            value={email}
+            onChange={(e) => { setEmail(e.target.value); setEmailFormatError(null); }}
+            required
+            className="rounded-lg border border-gray-300 bg-white px-3 py-2 text-sm text-text outline-none focus:border-primary dark:border-gray-600 dark:bg-gray-800 dark:text-darkText"
+          />
+          {emailFormatError && tab === 'register' && (
+            <p className="text-xs text-alert">{emailFormatError}</p>
+          )}
+        </div>
 
         <input
           type="password"

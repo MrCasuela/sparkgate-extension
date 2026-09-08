@@ -7,4 +7,6 @@ export interface LoginResponse {
 export interface RegisterResponse {
   message: string;
   user_id: string;
+  plan: string;
+  access_token?: string | null;
 }

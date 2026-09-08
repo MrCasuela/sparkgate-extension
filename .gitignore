@@ -3,3 +3,10 @@ dist/
 .env
 graphify-out/
 *.local
+coverage/
+
+# Config local de agentes (se usa local, no sube a GitHub)
+.claude/
+.opencode/
+CLAUDE.md
+AGENTS.md
