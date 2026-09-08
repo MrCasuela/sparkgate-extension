@@ -9,8 +9,11 @@ Proyecto académico — Universidad Andrés Bello, Chile.
 |---|---|
 | Chrome API | Manifest V3 |
 | UI | React 18 + TypeScript |
-| Build | Vite 5 + CRXJS v2 |
+| Build | Vite 5 (multi-entry: popup + dashboard, sin CRXJS) |
 | Estilos | Tailwind CSS 3 (modo oscuro) |
+| Tests | Vitest 3 + React Testing Library |
+| Lint | ESLint 10 (flat config) |
+| CI | GitHub Actions (typecheck + lint + test + build) |
 | Backend | FastAPI + Supabase + Ollama ([repositorio separado](../sparkgate-api)) |
 
 ## Requisitos
@@ -47,27 +50,45 @@ Genera `dist/` listo para Chrome Web Store.
 
 ## Endpoints del backend consumidos
 
+Todos los body son JSON. Solicitudes autenticadas usan `Authorization: Bearer`
+(JWT en `chrome.storage.local`); ante 401 el cliente limpia la sesión.
+
 | Método | Ruta | Auth | Body |
 |---|---|---|---|
-| POST | `/api/v1/auth/register` | — | form |
-| POST | `/api/v1/auth/login` | — | form |
-| POST | `/api/v1/auth/logout` | — | form |
+| POST | `/api/v1/auth/register` | — | JSON |
+| POST | `/api/v1/auth/login` | — | JSON |
+| POST | `/api/v1/auth/logout` | JWT Bearer | — |
 | POST | `/api/v1/passwords/evaluate` | JWT | JSON |
 | POST | `/api/v1/passwords/generate` | JWT | JSON |
 | GET | `/api/v1/health` | — | — |
+| GET | `/api/v1/dashboard/members` | JWT admin | — |
+| GET | `/api/v1/dashboard/audit-log` | JWT admin | — |
+| POST | `/api/v1/dashboard/credentials/{id}/revoke` | JWT admin | JSON |
+| POST | `/api/v1/dashboard/credentials/{id}/suggest` | JWT admin | JSON |
+| POST | `/api/v1/dashboard/credentials/{id}/restore` | JWT admin | — |
 
-## Componentes principales
+## Superficies de UI
 
 ```
-Popup
+Popup (index.html, 360×500px)
 ├── AuthScreen (login / registro)
-├── Navigator
-│   ├── GeneratorScreen
-│   │   ├── AlphanumericTab (slider 12-64, charset toggles)
-│   │   └── MemorableTab (frase IA)
-│   └── DetectorScreen (evaluación: entropía + IA + HIBP)
+└── Navigator
+    ├── Generador (AlphanumericTab | MemorableTab)
+    ├── Detector (entropía + AI + HIBP)
+    └── Botón "Panel de administración" → abre dashboard.html en pestaña
+
+Dashboard (dashboard.html, pestaña completa — solo admin)
+├── Lista de miembros y credenciales (interna/externa, estado)
+└── Audit log + export CSV
 ```
 
 ## Especificación
 
-`SPEC.md` contiene la especificación formal del proyecto (tasks, invariantes). Ver `AGENTS.md` para guía del agente OpenCode.
+`SPEC.md` contiene la especificación formal del proyecto (tasks, invariantes).
+Ver `AGENTS.md` para guía del agente OpenCode.
+
+## Arquitectura
+
+Diagramas de capas, componentes, flujos y modelo de datos en
+[`docs/ARQUITECTURA.md`](docs/ARQUITECTURA.md). Matriz de pruebas en
+[`docs/PRUEBAS.md`](docs/PRUEBAS.md).
