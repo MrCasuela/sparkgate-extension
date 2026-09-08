@@ -1,6 +1,6 @@
 # SparkGate Extension — SPEC
 
-> Chrome Extension MV3 + React 18 + TW3 + Vite/CRXJS
+> Chrome Extension MV3 + React 18 + TW3 + Vite (sin CRXJS)
 > Backend: `sparkgate-api` (FastAPI + Supabase + Ollama)
 
 ---
@@ -14,7 +14,7 @@ Auth via Supabase JWT. Dark mode. Mock plan badge.
 
 - Popup ≤360×500px, no scroll ideal (scroll ok if needed)
 - JWT ∈ `chrome.storage.local` (⊥ `sync`)
-- Backend URL: dev `localhost:8000`, prod Railway (configurable `chrome.storage.sync`)
+- Backend URL: dev `http://localhost:8000`, prod `https://*.vercel.app` (inlineada en build via `VITE_API_URL`, no configurable en runtime)
 - CORS backend ya permite `chrome-extension://*`
 - TW3 + `tailwind.config.ts` + `dark:` class strategy
 - Sin SSO (Google/Apple) — backlog
@@ -37,7 +37,7 @@ Auth via Supabase JWT. Dark mode. Mock plan badge.
 | I.dashboard-restore | api | POST `/api/v1/dashboard/credentials/{id}/restore` → `{credential,admin_api_success}` | JWT Bearer + admin |
 | I.error | api | ∀ error → `{detail:string}` (status 4xx/5xx) | — |
 | I.storage | chrome-api | `chrome.storage.local`: `{jwt,user_id,theme}` | — |
-| I.manifest | mv3 | `host_permissions: [backend_url/*]`, `action: {default_popup:popup/index.html}`, multi-entry vite: `index.html` + `dashboard.html` | — |
+| I.manifest | mv3 | `host_permissions: [localhost:8000, *.vercel.app]`, `action: {default_popup:index.html}`, multi-entry vite: `index.html` + `dashboard.html` | — |
 | I.dashboard-page | chrome-api | página `chrome-extension://[id]/dashboard.html`, abierta desde popup via `chrome.tabs.create({url: chrome.runtime.getURL('dashboard.html')})` | — |
 
 ## §V — Invariants
@@ -45,7 +45,7 @@ Auth via Supabase JWT. Dark mode. Mock plan badge.
 ```
 V1: ∀ api call → client.ts read JWT from chrome.storage.local, attach Authorization: Bearer
 V2: 401 response → clear JWT from storage, navigate AuthScreen
-V3: Auth body ! JSON (same as passwords)
+V3: Auth body JSON (same as passwords)
 V4: Generate length ≥12 ≤64 (backend valida, slider replica)
 V5: Dark mode init from chrome.storage.local (⊥ prefers-color-scheme)
 V6: Plan badge = mock "Gratuito", Upgrade btn disabled
