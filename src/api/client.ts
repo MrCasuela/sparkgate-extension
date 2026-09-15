@@ -1,4 +1,5 @@
 import { getJwt, clearAuth } from '../utils/storage';
+import { dispatchSessionExpired } from '../utils/authEvents';
 
 const BASE_URL = import.meta.env.VITE_API_URL ?? 'http://localhost:8000';
 
@@ -37,6 +38,7 @@ async function request<T>(
   if (!response.ok) {
     if (response.status === 401) {
       await clearAuth();
+      dispatchSessionExpired();
     }
     let detail = 'Error desconocido';
     try {

@@ -1,6 +1,8 @@
 import { useState, useEffect, useCallback } from 'react';
 import * as authApi from '../api/auth';
 import { getJwt, setJwt, setUserId, clearAuth, getUserId } from '../utils/storage';
+import { isJwtExpired } from '../utils/jwt';
+import { SESSION_EXPIRED_EVENT } from '../utils/authEvents';
 import type { RegisterResponse } from '../types/auth';
 
 export interface UseAuthReturn {
@@ -24,14 +26,29 @@ export function useAuth(): UseAuthReturn {
   const checkAuth = useCallback(async () => {
     const jwt = await getJwt();
     const uid = await getUserId();
-    setIsAuthenticated(jwt !== null);
-    setUserIdState(uid);
+    if (jwt !== null && isJwtExpired(jwt)) {
+      await clearAuth();
+      setIsAuthenticated(false);
+      setUserIdState(null);
+    } else {
+      setIsAuthenticated(jwt !== null);
+      setUserIdState(uid);
+    }
     setLoading(false);
   }, []);
 
   useEffect(() => {
     checkAuth();
   }, [checkAuth]);
+
+  useEffect(() => {
+    const onSessionExpired = () => {
+      setIsAuthenticated(false);
+      setUserIdState(null);
+    };
+    window.addEventListener(SESSION_EXPIRED_EVENT, onSessionExpired);
+    return () => window.removeEventListener(SESSION_EXPIRED_EVENT, onSessionExpired);
+  }, []);
 
   const login = useCallback(async (email: string, password: string) => {
     setError(null);
