@@ -10,3 +10,8 @@ export interface RegisterResponse {
   plan: string;
   access_token?: string | null;
 }
+
+export interface DeleteAccountRequest {
+  confirm_email: string;
+  password: string;
+}

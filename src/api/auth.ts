@@ -1,4 +1,4 @@
-import { post } from './client';
+import { del, post } from './client';
 import type { LoginResponse, RegisterResponse } from '../types/auth';
 
 export async function login(
@@ -17,4 +17,8 @@ export async function register(
 
 export async function logout(): Promise<void> {
   await post<{ message: string }>('/api/v1/auth/logout');
+}
+
+export async function deleteAccount(confirmEmail: string, password: string): Promise<void> {
+  await del<void>('/api/v1/auth/account', { confirm_email: confirmEmail, password });
 }
