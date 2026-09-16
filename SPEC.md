@@ -39,6 +39,13 @@ Auth via Supabase JWT. Dark mode. Mock plan badge.
 | I.storage | chrome-api | `chrome.storage.local`: `{jwt,user_id,theme}` | — |
 | I.manifest | mv3 | `host_permissions: [localhost:8000, *.vercel.app]`, `action: {default_popup:index.html}`, multi-entry vite: `index.html` + `dashboard.html` | — |
 | I.dashboard-page | chrome-api | página `chrome-extension://[id]/dashboard.html`, abierta desde popup via `chrome.tabs.create({url: chrome.runtime.getURL('dashboard.html')})` | — |
+| I.vault-save | api | POST `/api/v1/vault/items` `{service_name,username?,password,notes?}` → `{id,service_name,username?,created_at,updated_at}` (201, cifra AES-256-GCM en el backend, HU17 AC1/AC2) | JWT Bearer |
+| I.vault-list | api | GET `/api/v1/vault/items` → `[{id,service_name,username?,created_at,updated_at}]` (nunca descifra) | JWT Bearer |
+| I.vault-get | api | GET `/api/v1/vault/items/{id}` → `{id,service_name,username?,password,notes?}`; ítem de otro usuario → 404 (AC3) | JWT Bearer |
+| I.vault-delete | api | DELETE `/api/v1/vault/items/{id}` → 204; ítem de otro usuario → 404. No exige clave maestra (Ley 21.719) | JWT Bearer |
+| I.vault-purge | api | DELETE `/api/v1/vault/items` → `{deleted_count}` (Ley 21.719) | JWT Bearer |
+| I.vault-audit | api | GET `/api/v1/vault/audit` → `[{id,user_id,item_id?,action,result,created_at}]` (nunca service_name ni secretos, HU19) | JWT Bearer |
+| I.auth-delete-account | api | DELETE `/api/v1/auth/account` `{confirm_email,password}` → 204 (purga vault + borra el usuario). 400 si `confirm_email` no coincide (trim+lower), 401 si `password` es incorrecta. Irreversible | JWT Bearer |
 
 ## §V — Invariants
 
@@ -51,9 +58,12 @@ V5: Dark mode init from chrome.storage.local (⊥ prefers-color-scheme)
 V6: Plan badge = mock "Gratuito", Upgrade btn disabled
 V7: Popup ≤360×500px
 V8: Dashboard endpoints requieren admin (is_admin). 403 → UI "Solo administradores". Verificación via require_admin backend
-V9: Password (draft local / sugerida) NUNCA se envía al audit log ni se persiste; solo se muestra para copiar (externa AC3). AC4
+V9: Password del detector (draft local) y sugerida (dashboard) NUNCA se persisten ni se envían al audit log; solo se muestran para copiar (externa AC3, dashboard AC4). Las credenciales del vault SÍ se persisten, pero siempre cifradas en el backend (AES-256-GCM, HU17 AC2) — su audit log registra la acción, nunca el secreto (HU17 AC4)
 V10: Revoke interna bloquea logins futuros de inmediato (ban_duration); access token emitido sigue válido ~1h (AC6, no oculto)
 V11: Logout usa Bearer, revoca sesión propia (scope global). No revoca otro usuario → offboarding de miembro via revoke dashboard
+V12: Vault sin clave maestra en el backend → 503 en guardar/consultar (HU17 AC5). El borrado (ítem, purga total o cuenta) nunca depende de la clave maestra — es el mecanismo de supresión de datos (Ley 21.719) y debe seguir funcionando con el módulo caído
+V13: El secreto de un ítem del vault solo se pide on-demand (GET /items/{id}) al presionar "Ver"; nunca se persiste en chrome.storage ni se precarga al listar
+V14: Eliminar cuenta exige escribir el correo exacto de la sesión (normalizado trim+lower, igual que el backend) más la contraseña; acción irreversible, sin atajo de "solo un click"
 ```
 
 ## §T — Tasks
@@ -74,6 +84,9 @@ V11: Logout usa Bearer, revoca sesión propia (scope global). No revoca otro usu
 | T12 | x | Lista miembros + credenciales (interna/externa, estado) + modales claim action (revoke AC2 / suggest AC3 / restore), self-revoke hidden | V8, V9, V10, I.dashboard-revoke, I.dashboard-suggest |
 | T13 | x | Audit log tabla + export CSV (sin password, AC4) | V9, I.dashboard-audit-log |
 | T14 | x | Dashboard en AGENTS.md endpoints + logout real actualizado; build verificado (popup+dashboard) | V8-V11 |
+| T15 | x | Tipos + api client vault: VaultItem/VaultSecret/VaultItemCreate/VaultPurgeResponse; saveItem/listItems/getSecret/deleteItem/purgeVault + helper `del` en client.ts (maneja 204 sin body) | I.vault-save, I.vault-list, I.vault-get, I.vault-delete, I.vault-purge |
+| T16 | x | VaultScreen (tercer tab del Navigator): sub-tabs Guardar/Mis credenciales, useVault hook, ver/copiar/ocultar credencial on-demand, eliminar por ítem, banner de módulo no operativo (503) | V9, V12, V13, I.vault-save, I.vault-list, I.vault-get, I.vault-delete |
+| T17 | x | DangerZone: purga total del vault + eliminación de cuenta (correo exacto vía `getJwtEmail` + contraseña, modal de confirmación) | V14, I.vault-purge, I.auth-delete-account |
 
 ### Status legend
 
@@ -83,3 +96,4 @@ V11: Logout usa Bearer, revoca sesión propia (scope global). No revoca otro usu
 
 | id | date | cause | fix |
 |---|---|---|---|
+| B1 | 2026-08-31 | Cliente SDK con `sign_in` reutilizado como singleton: supabase-py reescribe el header `Authorization` del cliente en `SIGNED_IN`, dejándolo como el último usuario para todo el proceso | Revocar con token explícito (`admin.sign_out(jwt, scope="global")`); el camino de sign-in usa cliente efímero `create_auth_client()` cerrado en `finally`. Ver `_Leccion-singleton-sdk-muta-estado-global` |
