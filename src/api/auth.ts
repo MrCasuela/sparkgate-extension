@@ -1,5 +1,5 @@
 import { del, post } from './client';
-import type { LoginResponse, RegisterResponse } from '../types/auth';
+import type { AccountType, LoginResponse, RegisterResponse } from '../types/auth';
 
 export async function login(
   email: string,
@@ -11,8 +11,15 @@ export async function login(
 export async function register(
   email: string,
   password: string,
+  typeAccount: AccountType = 'personal',
+  organizationName?: string,
 ): Promise<RegisterResponse> {
-  return post<RegisterResponse>('/api/v1/auth/register', { email, password });
+  return post<RegisterResponse>('/api/v1/auth/register', {
+    email,
+    password,
+    type_account: typeAccount,
+    ...(organizationName ? { organization_name: organizationName } : {}),
+  });
 }
 
 export async function logout(): Promise<void> {

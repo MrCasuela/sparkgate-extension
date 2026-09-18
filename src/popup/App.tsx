@@ -6,6 +6,7 @@ import { LoadingSpinner } from '../components/LoadingSpinner';
 function App() {
   const {
     isAuthenticated,
+    isEnterprise,
     loading,
     login,
     register,
@@ -25,7 +26,7 @@ function App() {
   return (
     <div className="h-[500px] w-[360px] overflow-hidden bg-bg dark:bg-darkBg">
       {isAuthenticated ? (
-        <Navigator onLogout={logout} />
+        <Navigator onLogout={logout} isEnterprise={isEnterprise} />
       ) : (
         <AuthScreen
           login={login}
