@@ -4,6 +4,7 @@ import { LoadingSpinner } from './LoadingSpinner';
 import { ErrorAlert } from './ErrorAlert';
 import type { UseAuthReturn } from '../hooks/useAuth';
 import { ApiError } from '../api/client';
+import type { AccountType } from '../types/auth';
 
 type Tab = 'login' | 'register';
 
@@ -29,6 +30,8 @@ export function AuthScreen({
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [confirmPassword, setConfirmPassword] = useState('');
+  const [typeAccount, setTypeAccount] = useState<AccountType>('personal');
+  const [organizationName, setOrganizationName] = useState('');
   const [registerSuccess, setRegisterSuccess] = useState(false);
   const [emailFormatError, setEmailFormatError] = useState<string | null>(null);
   const [infoMessage, setInfoMessage] = useState<string | null>(null);
@@ -58,7 +61,12 @@ export function AuthScreen({
       return;
     }
     try {
-      const res = await register(email, password);
+      const res = await register(
+        email,
+        password,
+        typeAccount,
+        typeAccount === 'enterprise' ? organizationName : undefined,
+      );
       if (res.access_token) {
         // Auto-login: App will switch to the main panel now that isAuthenticated is true.
         return;
@@ -68,6 +76,7 @@ export function AuthScreen({
       setEmail('');
       setPassword('');
       setConfirmPassword('');
+      setOrganizationName('');
     } catch (e: unknown) {
       if (e instanceof ApiError && e.status === 409) {
         clearError();
@@ -150,6 +159,42 @@ export function AuthScreen({
         )}
 
         {error && <ErrorAlert message={error} onDismiss={clearError} />}
+
+        {tab === 'register' && (
+          <div className="flex flex-col gap-2">
+            <span className="text-xs font-medium text-gray-500 dark:text-gray-400">
+              Tipo de cuenta
+            </span>
+            <div className="flex rounded-lg bg-gray-100 p-1 dark:bg-gray-800">
+              {(['personal', 'enterprise'] as const).map((option) => (
+                <button
+                  key={option}
+                  type="button"
+                  onClick={() => setTypeAccount(option)}
+                  className={`flex-1 rounded-md py-1.5 text-xs font-medium transition-colors ${
+                    typeAccount === option
+                      ? 'bg-white text-primary shadow-sm dark:bg-gray-700 dark:text-white'
+                      : 'text-gray-500 hover:text-gray-700 dark:text-gray-400'
+                  }`}
+                >
+                  {option === 'personal' ? 'Cuenta personal' : 'Cuenta empresa'}
+                </button>
+              ))}
+            </div>
+            {typeAccount === 'enterprise' && (
+              <input
+                type="text"
+                placeholder="Nombre de la empresa"
+                value={organizationName}
+                onChange={(e) => setOrganizationName(e.target.value)}
+                required
+                minLength={2}
+                maxLength={120}
+                className="rounded-lg border border-gray-300 bg-white px-3 py-2 text-sm text-text outline-none focus:border-primary dark:border-gray-600 dark:bg-gray-800 dark:text-darkText"
+              />
+            )}
+          </div>
+        )}
 
         <div className="flex flex-col gap-1">
           <input
