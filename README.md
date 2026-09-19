@@ -61,11 +61,14 @@ Todos los body son JSON. Solicitudes autenticadas usan `Authorization: Bearer`
 | POST | `/api/v1/passwords/evaluate` | JWT | JSON |
 | POST | `/api/v1/passwords/generate` | JWT | JSON |
 | GET | `/api/v1/health` | — | — |
-| GET | `/api/v1/dashboard/members` | JWT admin | — |
-| GET | `/api/v1/dashboard/audit-log` | JWT admin | — |
-| POST | `/api/v1/dashboard/credentials/{id}/revoke` | JWT admin | JSON |
-| POST | `/api/v1/dashboard/credentials/{id}/suggest` | JWT admin | JSON |
-| POST | `/api/v1/dashboard/credentials/{id}/restore` | JWT admin | — |
+| GET | `/api/v1/dashboard/members` | JWT empresa | — |
+| POST | `/api/v1/dashboard/members` | JWT empresa | JSON |
+| GET | `/api/v1/dashboard/audit-log` | JWT empresa | — |
+| POST | `/api/v1/dashboard/credentials/{id}/revoke` | JWT empresa | JSON |
+| POST | `/api/v1/dashboard/credentials/{id}/suggest` | JWT empresa | JSON |
+| POST | `/api/v1/dashboard/credentials/{id}/restore` | JWT empresa | — |
+| GET | `/api/v1/dashboard/members/{id}/vault` | JWT empresa | — |
+| POST | `/api/v1/dashboard/members/{mid}/vault/{iid}/reveal` | JWT empresa | — |
 
 ## Superficies de UI
 
@@ -76,8 +79,9 @@ Popup (index.html, 360×500px)
     ├── Generador (AlphanumericTab | MemorableTab)
     ├── Detector (entropía + AI + HIBP)
     └── Botón "Panel de administración" → abre dashboard.html en pestaña
+        (solo visible en cuentas de empresa)
 
-Dashboard (dashboard.html, pestaña completa — solo admin)
+Dashboard (dashboard.html, pestaña completa — solo cuentas de empresa)
 ├── Lista de miembros y credenciales (interna/externa, estado)
 └── Audit log + export CSV
 ```

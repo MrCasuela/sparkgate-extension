@@ -61,6 +61,19 @@ export function get<T>(path: string): Promise<T> {
   return request<T>(path, { method: 'GET' });
 }
 
+export function put<T>(path: string, body?: unknown): Promise<T> {
+  const options: RequestInit = { method: 'PUT' };
+
+  if (body !== undefined) {
+    options.body = JSON.stringify(body);
+    options.headers = {
+      'Content-Type': 'application/json',
+    };
+  }
+
+  return request<T>(path, options);
+}
+
 export function del<T>(path: string, body?: unknown): Promise<T> {
   const options: RequestInit = { method: 'DELETE' };
 

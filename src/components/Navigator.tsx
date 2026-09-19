@@ -8,9 +8,14 @@ type Tab = 'generator' | 'detector' | 'vault';
 
 interface NavigatorProps {
   onLogout: () => Promise<void>;
+  /**
+   * HU21 AC4. Llega por props y no desde un useAuth() propio: el hook se llama
+   * una sola vez por raíz de página (App.tsx para el popup).
+   */
+  isEnterprise: boolean;
 }
 
-export function Navigator({ onLogout }: NavigatorProps) {
+export function Navigator({ onLogout, isEnterprise }: NavigatorProps) {
   const { dark, toggleDark } = useTheme();
   const [tab, setTab] = useState<Tab>('generator');
 
@@ -36,15 +41,19 @@ export function Navigator({ onLogout }: NavigatorProps) {
         </div>
       </div>
 
-      {/* Admin panel entry point */}
-      <div className="mx-4 mt-3">
-        <button
-          onClick={() => chrome.tabs.create({ url: chrome.runtime.getURL('dashboard.html') })}
-          className="w-full rounded-lg border border-primary/30 py-2 text-xs font-medium text-primary hover:bg-primary/10 dark:text-white"
-        >
-          Panel de administración
-        </button>
-      </div>
+      {/* Admin panel entry point — solo cuentas de empresa (HU21 AC4). Antes se
+          ofrecía a todo el mundo y el backend respondía 403: una puerta cerrada
+          con cartel de bienvenida. */}
+      {isEnterprise && (
+        <div className="mx-4 mt-3">
+          <button
+            onClick={() => chrome.tabs.create({ url: chrome.runtime.getURL('dashboard.html') })}
+            className="w-full rounded-lg border border-primary/30 py-2 text-xs font-medium text-primary hover:bg-primary/10 dark:text-white"
+          >
+            Panel de administración
+          </button>
+        </div>
+      )}
 
       {/* Tabs */}
       <div className="mx-4 mt-3 flex rounded-lg bg-gray-100 p-1 dark:bg-gray-800">
