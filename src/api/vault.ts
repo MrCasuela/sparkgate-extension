@@ -1,5 +1,11 @@
 import { get, post, del } from './client';
-import type { VaultItem, VaultItemCreate, VaultPurgeResponse, VaultSecret } from '../types/vault';
+import type {
+  VaultAuditEntry,
+  VaultItem,
+  VaultItemCreate,
+  VaultPurgeResponse,
+  VaultSecret,
+} from '../types/vault';
 
 export function saveItem(payload: VaultItemCreate): Promise<VaultItem> {
   return post<VaultItem>('/api/v1/vault/items', payload);
@@ -19,4 +25,9 @@ export function deleteItem(itemId: string): Promise<void> {
 
 export function purgeVault(): Promise<VaultPurgeResponse> {
   return del<VaultPurgeResponse>('/api/v1/vault/items');
+}
+
+/** El historial de accesos a tu bóveda, incluidos los de tu empresa (HU21 AC7). */
+export function getAudit(): Promise<VaultAuditEntry[]> {
+  return get<VaultAuditEntry[]>('/api/v1/vault/audit');
 }
