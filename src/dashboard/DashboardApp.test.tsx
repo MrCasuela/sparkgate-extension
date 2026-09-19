@@ -115,6 +115,23 @@ describe('DashboardApp — el panel muestra lo que devuelve el backend (B2)', ()
     expect(within(dialog).getByLabelText('Contraseña')).toHaveValue('Vigente#De#La#Cuenta1');
   });
 
+  it('tras la sugerencia, la externa pendiente se confirma con «Confirmar contraseña»', async () => {
+    const pending = { ...EXTERNAL, status: 'pendiente_aplicacion_manual' as const };
+    api.getMembers.mockResolvedValue([member({ credentials: [INTERNAL, pending] })]);
+    api.restoreCredential.mockResolvedValue(actionResponse({ credential: { ...EXTERNAL, status: 'activa' } }));
+    await renderPanel();
+
+    expect(screen.queryByText('Restaurar acceso')).toBeNull();
+    await userEvent.click(screen.getByText('Confirmar contraseña'));
+
+    const confirm = await screen.findByRole('dialog', { name: 'Confirmar contraseña' });
+    expect(confirm.textContent).toMatch(/ya aplicaste la contraseña sugerida en Google Workspace/);
+    await userEvent.click(within(confirm).getByText('Ya la apliqué'));
+
+    await waitFor(() => expect(api.restoreCredential).toHaveBeenCalledWith('ext-1'));
+    expect(await screen.findByRole('dialog', { name: 'Contraseña confirmada' })).toBeInTheDocument();
+  });
+
   it('las cuentas sin asignar aparecen en su propia sección', async () => {
     api.getUnassignedCredentials.mockResolvedValue([
       credential({ id: 'pool-1', service_name: 'Google Ads (cuenta compartida)', member_id: null }),

@@ -49,7 +49,7 @@ export function ConfirmActionModal({
       <p className="mb-3 text-sm">
         {kind === 'revoke'
           ? 'SparkGate genera una contraseña nueva, la aplica a la cuenta y la guarda cifrada. La cuenta queda bloqueada: la sesión que tenga abierta deja de funcionar en su próxima petición.'
-          : 'Es una cuenta externa: SparkGate no puede cambiarla en el servicio. Genera una contraseña sugerida y la guarda cifrada; la cuenta queda «Pendiente» hasta que la apliques a mano y la restaures.'}
+          : 'Es una cuenta externa: SparkGate no puede cambiarla en el servicio. Genera una contraseña sugerida y la guarda cifrada; la cuenta queda «Pendiente» hasta que la apliques a mano y confirmes la contraseña.'}
       </p>
 
       <label htmlFor="custom-password" className="mb-1 block text-xs font-medium text-gray-500 dark:text-gray-400">

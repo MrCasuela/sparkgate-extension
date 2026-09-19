@@ -101,7 +101,7 @@ export function CredentialRow({
 
         {credential.status !== 'activa' && (
           <button onClick={() => onRestore(credential)} className={SECONDARY_BUTTON}>
-            Restaurar acceso
+            {isInternal ? 'Restaurar acceso' : 'Confirmar contraseña'}
           </button>
         )}
       </div>

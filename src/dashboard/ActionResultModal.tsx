@@ -35,7 +35,10 @@ export function ActionResultModal({ result, onClose }: ActionResultModalProps) {
   const { kind, credential } = result;
 
   return (
-    <Modal title={TITLE[kind]} subtitle={result.title}>
+    <Modal
+      title={kind === 'restore' && credential.type === 'externa' ? 'Contraseña confirmada' : TITLE[kind]}
+      subtitle={result.title}
+    >
       {kind === 'revoke' && (
         <p className="mb-3 text-sm">
           {result.adminApiSuccess
@@ -45,7 +48,7 @@ export function ActionResultModal({ result, onClose }: ActionResultModalProps) {
       )}
       {kind === 'suggest' && (
         <p className="mb-3 text-sm">
-          Es una cuenta externa: aplicá esta contraseña a mano en el servicio y después restaurá la cuenta.
+          Es una cuenta externa: aplicá esta contraseña a mano en el servicio y después confirmala desde «Confirmar contraseña».
         </p>
       )}
       {kind === 'restore' && (
@@ -54,7 +57,7 @@ export function ActionResultModal({ result, onClose }: ActionResultModalProps) {
             ? result.adminApiSuccess
               ? 'Cuenta desbaneada — ya puede volver a iniciar sesión con la última contraseña aplicada.'
               : 'No se pudo confirmar el desbaneo con Supabase — revisá el log del backend.'
-            : 'Estado vuelto a Activa.'}
+            : 'La cuenta vuelve a estar Activa: la contraseña guardada es la que quedó aplicada en el servicio.'}
         </p>
       )}
       {kind === 'reassign' && (

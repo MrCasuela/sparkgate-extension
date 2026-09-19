@@ -69,10 +69,25 @@ describe('CredentialRow', () => {
     expect(screen.getByText('Reasignar')).toBeInTheDocument();
   });
 
-  it('una credencial no activa ofrece restaurar y no guardar', () => {
-    const handlers = renderRow(credential({ status: 'pendiente_aplicacion_manual' }));
-    expect(screen.getByText('Restaurar acceso')).toBeInTheDocument();
+  it('una externa pendiente ofrece «Confirmar contraseña», no «Restaurar acceso»', () => {
+    // Tras «Generar sugerencia» la cuenta espera que el admin aplique la contraseña a mano
+    // en el servicio: lo que se hace después es confirmarla, no restaurar un acceso.
+    renderRow(credential({ status: 'pendiente_aplicacion_manual' }));
+    expect(screen.getByText('Confirmar contraseña')).toBeInTheDocument();
+    expect(screen.queryByText('Restaurar acceso')).toBeNull();
     expect(screen.queryByText('Cambiar contraseña')).toBeNull();
-    expect(handlers.onRestore).not.toHaveBeenCalled();
+  });
+
+  it('una interna revocada sigue ofreciendo «Restaurar acceso» (desbanear)', () => {
+    renderRow(credential({ type: 'interna', supabase_user_id: 'u1', status: 'revocada' }));
+    expect(screen.getByText('Restaurar acceso')).toBeInTheDocument();
+    expect(screen.queryByText('Confirmar contraseña')).toBeNull();
+  });
+
+  it('el botón dispara onRestore con la credencial', async () => {
+    const c = credential({ status: 'pendiente_aplicacion_manual' });
+    const handlers = renderRow(c);
+    screen.getByText('Confirmar contraseña').click();
+    expect(handlers.onRestore).toHaveBeenCalledWith(c);
   });
 });

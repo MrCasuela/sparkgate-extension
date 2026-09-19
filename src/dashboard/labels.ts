@@ -17,7 +17,7 @@ export const ACTION_LABEL: Record<string, string> = {
   revocar_interna: 'Revocó acceso',
   sugerir_externa: 'Generó sugerencia',
   restaurar_interna: 'Restauró acceso',
-  restaurar_externa: 'Restauró estado',
+  restaurar_externa: 'Confirmó la contraseña aplicada',
   crear_trabajador: 'Dio de alta a un trabajador',
   listar_vault_miembro: 'Listó la bóveda del trabajador',
   consultar_vault_miembro: 'Abrió una credencial del trabajador',

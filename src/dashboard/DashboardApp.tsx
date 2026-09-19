@@ -362,7 +362,14 @@ export function DashboardApp() {
       setRestoreConfirm(null);
       await loadData();
     } catch (e: unknown) {
-      setLoadError(errorText(e, 'No se pudo restaurar el acceso'));
+      setLoadError(
+        errorText(
+          e,
+          restoreConfirm.credential.type === 'interna'
+            ? 'No se pudo restaurar el acceso'
+            : 'No se pudo confirmar la contraseña',
+        ),
+      );
       setRestoreConfirm(null);
     } finally {
       setRestoreSubmitting(false);
@@ -753,10 +760,13 @@ export function DashboardApp() {
       )}
 
       {restoreConfirm && (
-        <Modal title="Restaurar acceso">
+        <Modal
+          title={restoreConfirm.credential.type === 'interna' ? 'Restaurar acceso' : 'Confirmar contraseña'}
+        >
           <p className="mb-4 text-sm">
-            {restoreConfirm.memberName} — {restoreConfirm.credential.service_name} volverá a estado "Activa"
-            {restoreConfirm.credential.type === 'interna' ? ' y la cuenta se desbanea de inmediato.' : '.'}
+            {restoreConfirm.credential.type === 'interna'
+              ? `${restoreConfirm.memberName} — ${restoreConfirm.credential.service_name} volverá a estado "Activa" y la cuenta se desbanea de inmediato.`
+              : `Confirmá que ya aplicaste la contraseña sugerida en ${restoreConfirm.credential.service_name} (${restoreConfirm.memberName}). La cuenta vuelve a estado "Activa".`}
           </p>
           <div className="flex gap-2">
             <button
@@ -771,7 +781,13 @@ export function DashboardApp() {
               disabled={restoreSubmitting}
               className="flex-1 rounded-lg bg-primary py-2 text-sm font-semibold text-white hover:opacity-90 disabled:cursor-not-allowed disabled:opacity-50"
             >
-              {restoreSubmitting ? 'Restaurando...' : 'Confirmar'}
+              {restoreSubmitting
+                ? restoreConfirm.credential.type === 'interna'
+                  ? 'Restaurando...'
+                  : 'Confirmando...'
+                : restoreConfirm.credential.type === 'interna'
+                  ? 'Confirmar'
+                  : 'Ya la apliqué'}
             </button>
           </div>
         </Modal>

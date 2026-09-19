@@ -60,6 +60,27 @@ describe('ActionResultModal', () => {
     expect(screen.getByText(/Google Workspace — la conoce Bruno Vega/)).toBeInTheDocument();
   });
 
+  it('confirmar la contraseña de una externa no habla de «acceso restaurado»', () => {
+    render(
+      <ActionResultModal
+        result={result({ kind: 'restore', credential: credential({ type: 'externa' }), secretStored: null })}
+        onClose={() => {}}
+      />,
+    );
+    expect(screen.getByRole('dialog', { name: 'Contraseña confirmada' })).toBeInTheDocument();
+    expect(screen.queryByText('Acceso restaurado')).toBeNull();
+  });
+
+  it('restaurar una interna sigue diciendo «Acceso restaurado»', () => {
+    render(
+      <ActionResultModal
+        result={result({ kind: 'restore', credential: credential({ type: 'interna' }), secretStored: null })}
+        onClose={() => {}}
+      />,
+    );
+    expect(screen.getByRole('dialog', { name: 'Acceso restaurado' })).toBeInTheDocument();
+  });
+
   it('reasignar al pool dice que nadie la ve, y a alguien dice quién la verá', () => {
     const { rerender } = render(
       <ActionResultModal
