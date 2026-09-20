@@ -1,0 +1,24 @@
+El QR de enrolamiento se decodifica de vuelta al URI — 2026-09-20
+=================================================================
+Pregunta: el test src/utils/qr.test.ts compara el dibujo de qrPath() con un QR generado por la MISMA
+librería (qrcode-generator), así que no prueba que lo dibujado sea un QR legible que codifique el URI.
+Esta comprobación usa un decodificador INDEPENDIENTE.
+
+Método (una sola vez, fuera del repo; no queda como test porque exige OpenCV):
+  1. qrPath() de src/utils/qr.ts, con dos URI otpauth:// con la forma exacta que devuelve el backend
+     (otpauth://totp/SparkGate:<correo>?secret=<32 caracteres base32>&issuer=SparkGate&algorithm=SHA1&digits=6&period=30).
+  2. Se reconstruye la imagen a partir de las celdas que el SVG dibuja (negro sobre blanco, con la zona de
+     silencio de 4 módulos), ampliada 12x, y se la pasa a cv2.QRCodeDetector (OpenCV 5.0.0).
+
+Resultado:
+  OK  2 de 2: el texto decodificado es EXACTAMENTE el URI (49 módulos por lado).
+
+Controles negativos (para que la comparación no sea vacía):
+  - el dibujo del URI A comparado con el URI B -> distinto.
+  - 15 % y 30 % de módulos invertidos al azar -> ya no decodifica.
+  Dos controles previos fueron malos y se descartaron: una imagen transpuesta SÍ decodifica (un QR
+  transpuesto es su imagen espejo, que los decodificadores aceptan) y 100 módulos corrompidos SÍ decodifican
+  (caben en la corrección de errores, nivel M). No demostraban nada sobre la comprobación.
+
+Lo que NO prueba: que la cámara de un teléfono y una app de autenticación real lo lean en la pantalla real,
+ni cómo se ve el modal en Chrome. Eso sigue siendo el paso manual M3 del backend.
