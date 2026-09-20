@@ -20,6 +20,11 @@ export const VAULT_ACTION_LABEL: Record<string, string> = {
   consultar_admin: 'Tu empresa abrió una credencial tuya',
   consultar_admin_denegado: 'Intento fallido de tu empresa sobre tu bóveda',
   consultar_credencial_interna_admin: 'Tu empresa retiró la contraseña de tu cuenta SparkGate',
+  // HU18: el ciclo de vida de TU segundo factor. Lo ves acá porque es tu cuenta: si alguien lo toca, te enterás.
+  mfa_enrolar: 'Empezaste a configurar tu segundo factor',
+  mfa_activar: 'Activaste tu segundo factor',
+  mfa_desactivar: 'Desactivaste tu segundo factor',
+  mfa_denegado: 'Intento fallido con tu segundo factor',
 };
 
 /**

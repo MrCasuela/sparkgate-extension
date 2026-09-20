@@ -7,7 +7,7 @@ import * as passwordsApi from '../api/passwords';
 import * as mfaApi from '../api/mfa';
 import { setJwt, setUserId, clearAuth } from '../utils/storage';
 import { credential, member, makeJwt } from '../test/fixtures';
-import type { CredentialActionResponse } from '../types/dashboard';
+import type { AuditLogEntry, CredentialActionResponse } from '../types/dashboard';
 import { ApiError } from '../api/client';
 
 vi.mock('../api/dashboard');
@@ -361,6 +361,92 @@ describe('DashboardApp — el segundo factor en las operaciones sobre secretos a
 
     await waitFor(() => expect(api.restoreCredential).toHaveBeenCalledWith('ext-1'));
     expect(screen.queryByLabelText(/código de tu app/i)).not.toBeInTheDocument();
+  });
+});
+
+function auditEntry(overrides: Partial<AuditLogEntry> = {}): AuditLogEntry {
+  return {
+    id: crypto.randomUUID(),
+    actor_email: 'admin@pyme.cl',
+    actor_user_id: 'admin-1',
+    member_id: 'member-1',
+    target_member_id: null,
+    credential_id: 'int-1',
+    credential_type: 'interna',
+    vault_item_id: null,
+    action: 'revocar_interna',
+    denied_reason: null,
+    created_at: '2026-09-19T12:00:00Z',
+    ...overrides,
+  };
+}
+
+describe('DashboardApp — la auditoría muestra los intentos rechazados por el segundo factor (HU18 AC4)', () => {
+  it('una denegación dice qué se intentó y POR QUÉ falló, en lenguaje de persona', async () => {
+    api.getAuditLog.mockResolvedValue([
+      auditEntry({ action: 'revocar_interna_denegado', denied_reason: 'totp_invalido' }),
+      auditEntry({ action: 'consultar_secreto_denegado', denied_reason: 'totp_no_enrolado', credential_id: 'ext-1', credential_type: 'externa' }),
+    ]);
+    await renderPanel();
+
+    const table = await screen.findByRole('table');
+    expect(within(table).getByText(/Intento fallido de revocar un acceso — código incorrecto, ausente o vencido/)).toBeInTheDocument();
+    expect(within(table).getByText(/Intento fallido de ver una contraseña — no tenía un segundo factor configurado/)).toBeInTheDocument();
+  });
+
+  it('una entrada normal no muestra ningún motivo, y nunca aparece un identificador crudo', async () => {
+    api.getAuditLog.mockResolvedValue([auditEntry({ action: 'revocar_interna' })]);
+    await renderPanel();
+
+    const table = await screen.findByRole('table');
+    expect(within(table).getByText('Revocó acceso')).toBeInTheDocument();
+    expect(table.textContent).not.toContain('totp_');
+    expect(table.textContent).not.toContain('_denegado');
+  });
+
+  it('las tres acciones *_denegado nuevas tienen etiqueta: la tabla no muestra el identificador del backend', async () => {
+    api.getAuditLog.mockResolvedValue([
+      auditEntry({ action: 'revocar_interna_denegado', denied_reason: 'totp_reutilizado' }),
+      auditEntry({ action: 'sugerir_externa_denegado', denied_reason: 'totp_bloqueado' }),
+      auditEntry({ action: 'guardar_secreto_denegado', denied_reason: 'totp_invalido' }),
+    ]);
+    await renderPanel();
+
+    const table = await screen.findByRole('table');
+    expect(table.textContent).not.toMatch(/(revocar_interna|sugerir_externa|guardar_secreto)_denegado/);
+  });
+
+  it('el CSV exporta el motivo en su propia columna', async () => {
+    api.getAuditLog.mockResolvedValue([
+      auditEntry({ action: 'revocar_interna_denegado', denied_reason: 'totp_reutilizado' }),
+      auditEntry({ action: 'revocar_interna', denied_reason: null }),
+    ]);
+    // jsdom no implementa createObjectURL/revokeObjectURL: se definen y se quitan al terminar.
+    let captured: Blob | null = null;
+    Object.assign(URL, {
+      createObjectURL: (blob: Blob) => {
+        captured = blob;
+        return 'blob:audit';
+      },
+      revokeObjectURL: () => {},
+    });
+    vi.spyOn(HTMLAnchorElement.prototype, 'click').mockImplementation(() => {});
+    await renderPanel();
+
+    await userEvent.click(await screen.findByText('Exportar CSV'));
+
+    const text = await new Promise<string>((resolve) => {
+      const reader = new FileReader();
+      reader.onload = () => resolve(String(reader.result));
+      reader.readAsText(captured as unknown as Blob);
+    });
+    const [header, denied, normal] = text.split('\n');
+    expect(header).toBe('Fecha,Actor,Integrante,Cuenta,Tipo,Acción,Motivo');
+    expect(denied).toContain('el código ya se había usado');
+    expect(normal.endsWith(',')).toBe(true); // sin motivo: la celda va vacía
+    expect(text).not.toContain('totp_');
+    delete (URL as unknown as Record<string, unknown>).createObjectURL;
+    delete (URL as unknown as Record<string, unknown>).revokeObjectURL;
   });
 });
 

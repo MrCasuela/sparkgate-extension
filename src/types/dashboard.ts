@@ -116,5 +116,11 @@ export interface AuditLogEntry {
   credential_type: CredentialType | null;
   vault_item_id: string | null;
   action: string;
+  /**
+   * HU18: por qué el segundo factor rechazó la operación (totp_no_enrolado, totp_invalido,
+   * totp_reutilizado, totp_bloqueado). Solo viene en las entradas *_denegado; null en el resto y en
+   * las anteriores a HU18. Es siempre un identificador, nunca el código que se intentó.
+   */
+  denied_reason: string | null;
   created_at: string;
 }

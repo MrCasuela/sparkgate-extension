@@ -30,6 +30,10 @@ const BACKEND_VAULT_ACTIONS = [
   'consultar_admin',
   'consultar_admin_denegado',
   'consultar_credencial_interna_admin',
+  'mfa_enrolar',
+  'mfa_activar',
+  'mfa_desactivar',
+  'mfa_denegado',
 ];
 
 describe('AccessLogTab — la mitigación de privacidad de HU21', () => {

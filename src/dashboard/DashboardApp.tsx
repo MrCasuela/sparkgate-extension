@@ -24,7 +24,7 @@ import { ActionResultModal, type ActionResult } from './ActionResultModal';
 import { ConfirmActionModal, type ConfirmKind } from './ConfirmActionModal';
 import { CopyField } from './CopyField';
 import { CredentialRow } from './CredentialRow';
-import { ACTION_LABEL, auditMemberLabel } from './labels';
+import { ACTION_LABEL, auditActionLabel, auditMemberLabel, deniedReasonLabel } from './labels';
 import { Modal } from './Modal';
 import { NewCredentialForm } from './NewCredentialForm';
 import { ReassignModal } from './ReassignModal';
@@ -432,7 +432,7 @@ export function DashboardApp() {
 
   const exportAuditLogCsv = () => {
     if (!auditLog) return;
-    const header = ['Fecha', 'Actor', 'Integrante', 'Cuenta', 'Tipo', 'Acción'];
+    const header = ['Fecha', 'Actor', 'Integrante', 'Cuenta', 'Tipo', 'Acción', 'Motivo'];
     const rows = auditLog.map((entry) => [
       new Date(entry.created_at).toLocaleString('es-CL'),
       auditActorLabel(entry),
@@ -444,6 +444,7 @@ export function DashboardApp() {
           ? 'Externa'
           : 'Bóveda',
       ACTION_LABEL[entry.action] ?? entry.action,
+      deniedReasonLabel(entry.denied_reason) ?? '',
     ]);
     const csv = [header, ...rows].map((row) => row.map(csvEscape).join(',')).join('\n');
     const blob = new Blob([csv], { type: 'text/csv;charset=utf-8;' });
@@ -766,7 +767,7 @@ export function DashboardApp() {
                       <td className="px-3 py-2">{auditActorLabel(entry)}</td>
                       <td className="px-3 py-2">{auditMemberLabel(entry, memberNames)}</td>
                       <td className="px-3 py-2">{auditTargetLabel(entry)}</td>
-                      <td className="px-3 py-2">{ACTION_LABEL[entry.action] ?? entry.action}</td>
+                      <td className="px-3 py-2">{auditActionLabel(entry)}</td>
                     </tr>
                   ))}
                 </tbody>
