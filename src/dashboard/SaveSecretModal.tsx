@@ -1,6 +1,8 @@
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import type { Credential, CredentialSecretRequest } from '../types/dashboard';
-import { ErrorAlert } from '../components/ErrorAlert';
+import { StepUpAlert } from '../components/StepUpAlert';
+import { TotpCodeField } from '../components/TotpCodeField';
+import { isCompleteTotp, type StepUpKind } from '../utils/stepUp';
 import { Modal } from './Modal';
 
 interface SaveSecretModalProps {
@@ -8,9 +10,13 @@ interface SaveSecretModalProps {
   holderName: string | null;
   submitting: boolean;
   error: string | null;
+  /** Por qué falló, si fue el segundo factor: `enroll` ofrece configurarlo en vez de decir «código incorrecto». */
+  errorKind?: StepUpKind | null;
   onGenerate: () => Promise<string | null>;
-  onSubmit: (payload: CredentialSecretRequest) => void;
+  /** `code` es el del segundo factor (HU18): guardar una contraseña nueva ES rotar. */
+  onSubmit: (payload: CredentialSecretRequest, code: string) => void;
   onClose: () => void;
+  onEnroll?: () => void;
 }
 
 export function SaveSecretModal({
@@ -18,9 +24,11 @@ export function SaveSecretModal({
   holderName,
   submitting,
   error,
+  errorKind,
   onGenerate,
   onSubmit,
   onClose,
+  onEnroll,
 }: SaveSecretModalProps) {
   const isInternal = credential.type === 'interna';
   const [password, setPassword] = useState('');
@@ -28,6 +36,12 @@ export function SaveSecretModal({
   const [notes, setNotes] = useState('');
   const [apply, setApply] = useState(isInternal);
   const [generating, setGenerating] = useState(false);
+  const [code, setCode] = useState('');
+
+  // Un código rechazado no sirve de nuevo (el backend lo cuenta como reutilizado): no se deja escrito.
+  useEffect(() => {
+    if (error) setCode('');
+  }, [error]);
 
   const generate = async () => {
     setGenerating(true);
@@ -38,12 +52,15 @@ export function SaveSecretModal({
 
   const submit = (e: React.FormEvent) => {
     e.preventDefault();
-    onSubmit({
-      password,
-      ...(!isInternal && username ? { username } : {}),
-      ...(notes ? { notes } : {}),
-      ...(isInternal ? { apply_to_account: apply } : {}),
-    });
+    onSubmit(
+      {
+        password,
+        ...(!isInternal && username ? { username } : {}),
+        ...(notes ? { notes } : {}),
+        ...(isInternal ? { apply_to_account: apply } : {}),
+      },
+      code,
+    );
   };
 
   const inputClass =
@@ -54,11 +71,7 @@ export function SaveSecretModal({
       title={credential.has_secret ? 'Cambiar contraseña' : 'Guardar contraseña'}
       subtitle={`${holderName ? `${holderName} — ` : ''}${credential.service_name}`}
     >
-      {error && (
-        <div className="mb-3">
-          <ErrorAlert message={error} />
-        </div>
-      )}
+      {error && <StepUpAlert message={error} kind={errorKind} onEnroll={onEnroll} />}
       <form onSubmit={submit} className="flex flex-col gap-3">
         <div>
           <label htmlFor="secret-password" className="mb-1 block text-xs font-medium text-gray-500 dark:text-gray-400">
@@ -135,6 +148,13 @@ export function SaveSecretModal({
           </p>
         )}
 
+        <div>
+          <TotpCodeField id="save-totp" value={code} onChange={setCode} disabled={submitting} />
+          <p className="text-xs text-gray-500 dark:text-gray-400">
+            Guardar una contraseña nueva es rotarla: pide tu segundo factor. Cada código sirve una sola vez.
+          </p>
+        </div>
+
         <div className="flex gap-2">
           <button
             type="button"
@@ -146,7 +166,7 @@ export function SaveSecretModal({
           </button>
           <button
             type="submit"
-            disabled={submitting || password.length === 0}
+            disabled={submitting || password.length === 0 || !isCompleteTotp(code)}
             className="flex-1 rounded-lg bg-primary py-2 text-sm font-semibold text-white hover:opacity-90 disabled:cursor-not-allowed disabled:opacity-50"
           >
             {submitting ? 'Guardando...' : 'Guardar'}

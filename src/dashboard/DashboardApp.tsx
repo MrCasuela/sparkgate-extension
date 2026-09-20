@@ -6,6 +6,8 @@ import { LoadingSpinner } from '../components/LoadingSpinner';
 import { MfaEnrollment } from '../components/MfaEnrollment';
 import { ErrorAlert } from '../components/ErrorAlert';
 import { ApiError } from '../api/client';
+import { useStepUpPrompt } from '../hooks/useStepUpPrompt';
+import { stepUpFailure, type StepUpKind } from '../utils/stepUp';
 import * as dashboardApi from '../api/dashboard';
 import * as passwordsApi from '../api/passwords';
 import type {
@@ -72,6 +74,12 @@ function errorText(e: unknown, fallback: string): string {
   return e instanceof Error ? e.message : fallback;
 }
 
+/** El error de una acción que pide el segundo factor: si fue el factor, también QUÉ hay que hacer (V20: el detail, tal cual). */
+function failureOf(e: unknown, fallback: string): { message: string; kind: StepUpKind | null } {
+  const step = stepUpFailure(e);
+  return { message: step?.message ?? errorText(e, fallback), kind: step?.kind ?? null };
+}
+
 export function DashboardApp() {
   const { isAuthenticated, userId, loading, login, register, error, clearError, logout } = useAuth();
   const { dark, toggleDark } = useTheme();
@@ -89,6 +97,7 @@ export function DashboardApp() {
   const [pendingAction, setPendingAction] = useState<PendingAction | null>(null);
   const [confirmSubmitting, setConfirmSubmitting] = useState(false);
   const [confirmError, setConfirmError] = useState<string | null>(null);
+  const [confirmErrorKind, setConfirmErrorKind] = useState<StepUpKind | null>(null);
 
   const [restoreConfirm, setRestoreConfirm] = useState<RestoreConfirm | null>(null);
   const [restoreSubmitting, setRestoreSubmitting] = useState(false);
@@ -97,10 +106,10 @@ export function DashboardApp() {
 
   // Contraseña guardada de una credencial de la organización (etapa C)
   const [revealedCredential, setRevealedCredential] = useState<RevealedCredential | null>(null);
-  const [revealingCredentialId, setRevealingCredentialId] = useState<string | null>(null);
   const [saveTarget, setSaveTarget] = useState<CredentialTarget | null>(null);
   const [saveSubmitting, setSaveSubmitting] = useState(false);
   const [saveError, setSaveError] = useState<string | null>(null);
+  const [saveErrorKind, setSaveErrorKind] = useState<StepUpKind | null>(null);
   const [reassignTarget, setReassignTarget] = useState<Credential | null>(null);
   const [reassignSubmitting, setReassignSubmitting] = useState(false);
   const [reassignError, setReassignError] = useState<string | null>(null);
@@ -116,7 +125,10 @@ export function DashboardApp() {
   // Bóveda por integrante (HU21 AC5/AC6). Carga perezosa al expandir.
   const [vaultByMember, setVaultByMember] = useState<Record<string, VaultState>>({});
   const [revealedSecret, setRevealedSecret] = useState<RevealedSecret | null>(null);
-  const [revealingItemId, setRevealingItemId] = useState<string | null>(null);
+
+  // Ver una contraseña ajena pide el segundo factor. Sin uno configurado, el modal lleva a configurarlo.
+  const openMfa = useCallback(() => setShowMfa(true), []);
+  const stepUp = useStepUpPrompt(openMfa);
 
   const loadData = useCallback(async () => {
     setForbidden(false);
@@ -235,45 +247,49 @@ export function DashboardApp() {
     }
   };
 
-  const revealVaultItem = async (member: Member, itemId: string) => {
-    setRevealingItemId(itemId);
-    try {
-      const secret = await dashboardApi.revealMemberVaultItem(member.id, itemId);
-      setRevealedSecret({ memberName: member.full_name, secret });
-      // La lectura quedó registrada en los dos logs; refrescamos para que la
-      // entrada aparezca sin recargar la página.
-      await loadData();
-    } catch (err: unknown) {
-      setLoadError(errorText(err, 'No se pudo abrir la credencial del trabajador'));
-    } finally {
-      setRevealingItemId(null);
-    }
+  const revealVaultItem = (member: Member, item: VaultItem) => {
+    stepUp.ask({
+      title: 'Ver contraseña del trabajador',
+      subtitle: `${item.service_name} — bóveda de ${member.full_name}`,
+      description:
+        'Es un dato personal del trabajador. La consulta queda registrada en la auditoría de la empresa y también en la que él mismo ve. Confirmá con tu segundo factor.',
+      run: async (code) => {
+        const secret = await dashboardApi.revealMemberVaultItem(member.id, item.id, code);
+        setRevealedSecret({ memberName: member.full_name, secret });
+        // La lectura quedó registrada en los dos logs; refrescamos para que la
+        // entrada aparezca sin recargar la página.
+        await loadData();
+      },
+    });
   };
 
-  const revealCredential = async (credential: Credential) => {
-    setRevealingCredentialId(credential.id);
-    try {
-      const secret = await dashboardApi.revealCredentialSecret(credential.id);
-      setRevealedCredential({ secret, holderName: holderNameOf(credential) });
-      await loadData();
-    } catch (err: unknown) {
-      setLoadError(errorText(err, 'No se pudo abrir la contraseña'));
-    } finally {
-      setRevealingCredentialId(null);
-    }
+  const revealCredential = (credential: Credential) => {
+    const holderName = holderNameOf(credential);
+    stepUp.ask({
+      title: 'Ver contraseña',
+      subtitle: `${holderName ? `${holderName} — ` : ''}${credential.service_name}`,
+      description: 'La consulta queda registrada en la auditoría de la empresa. Confirmá con tu segundo factor.',
+      run: async (code) => {
+        const secret = await dashboardApi.revealCredentialSecret(credential.id, code);
+        setRevealedCredential({ secret, holderName });
+        await loadData();
+      },
+    });
   };
 
   const openSaveSecret = (credential: Credential) => {
     setSaveError(null);
+    setSaveErrorKind(null);
     setSaveTarget({ credential, holderName: holderNameOf(credential) });
   };
 
-  const submitSaveSecret = async (payload: CredentialSecretRequest) => {
+  const submitSaveSecret = async (payload: CredentialSecretRequest, code: string) => {
     if (!saveTarget) return;
     setSaveSubmitting(true);
     setSaveError(null);
+    setSaveErrorKind(null);
     try {
-      const res = await dashboardApi.saveCredentialSecret(saveTarget.credential.id, payload);
+      const res = await dashboardApi.saveCredentialSecret(saveTarget.credential.id, payload, code);
       setActionResult({
         kind: 'save',
         title: `${saveTarget.holderName ? `${saveTarget.holderName} — ` : ''}${saveTarget.credential.service_name}`,
@@ -286,7 +302,9 @@ export function DashboardApp() {
       setSaveTarget(null);
       await loadData();
     } catch (err: unknown) {
-      setSaveError(errorText(err, 'No se pudo guardar la contraseña'));
+      const failure = failureOf(err, 'No se pudo guardar la contraseña');
+      setSaveError(failure.message);
+      setSaveErrorKind(failure.kind);
     } finally {
       setSaveSubmitting(false);
     }
@@ -318,18 +336,20 @@ export function DashboardApp() {
 
   const openPendingAction = (kind: ConfirmKind, memberName: string, credential: Credential) => {
     setConfirmError(null);
+    setConfirmErrorKind(null);
     setPendingAction({ kind, memberName, credential });
   };
 
-  const confirmPendingAction = async (customPassword?: string) => {
+  const confirmPendingAction = async (customPassword: string | undefined, code: string) => {
     if (!pendingAction) return;
     setConfirmSubmitting(true);
     setConfirmError(null);
+    setConfirmErrorKind(null);
     try {
       const res =
         pendingAction.kind === 'revoke'
-          ? await dashboardApi.revokeInternal(pendingAction.credential.id, customPassword)
-          : await dashboardApi.suggestExternal(pendingAction.credential.id, customPassword);
+          ? await dashboardApi.revokeInternal(pendingAction.credential.id, customPassword, code)
+          : await dashboardApi.suggestExternal(pendingAction.credential.id, customPassword, code);
       setActionResult({
         kind: pendingAction.kind,
         title: `${pendingAction.memberName} — ${pendingAction.credential.service_name}`,
@@ -343,7 +363,9 @@ export function DashboardApp() {
       setPendingAction(null);
       await loadData();
     } catch (e: unknown) {
-      setConfirmError(errorText(e, 'No se pudo completar la acción'));
+      const failure = failureOf(e, 'No se pudo completar la acción');
+      setConfirmError(failure.message);
+      setConfirmErrorKind(failure.kind);
     } finally {
       setConfirmSubmitting(false);
     }
@@ -466,7 +488,6 @@ export function DashboardApp() {
       key={credential.id}
       credential={credential}
       isOwnAccount={credential.supabase_user_id === userId}
-      busy={revealingCredentialId === credential.id}
       onReveal={revealCredential}
       onSaveSecret={openSaveSecret}
       onReassign={(c) => {
@@ -676,11 +697,10 @@ export function DashboardApp() {
                             )}
                           </div>
                           <button
-                            onClick={() => revealVaultItem(member, item.id)}
-                            disabled={revealingItemId === item.id}
+                            onClick={() => revealVaultItem(member, item)}
                             className="rounded-lg border border-primary/40 px-3 py-1 text-xs font-semibold text-primary transition-opacity hover:bg-primary/10 disabled:opacity-50 dark:text-white"
                           >
-                            {revealingItemId === item.id ? 'Abriendo...' : 'Ver contraseña'}
+                            Ver contraseña
                           </button>
                         </div>
                       ))}
@@ -763,8 +783,13 @@ export function DashboardApp() {
           credential={pendingAction.credential}
           submitting={confirmSubmitting}
           error={confirmError}
+          errorKind={confirmErrorKind}
           onConfirm={confirmPendingAction}
           onClose={() => setPendingAction(null)}
+          onEnroll={() => {
+            setPendingAction(null);
+            setShowMfa(true);
+          }}
         />
       )}
 
@@ -802,6 +827,8 @@ export function DashboardApp() {
         </Modal>
       )}
 
+      {stepUp.modal}
+
       {showMfa && (
         <Modal
           title="Segundo factor de verificación"
@@ -825,9 +852,14 @@ export function DashboardApp() {
           holderName={saveTarget.holderName}
           submitting={saveSubmitting}
           error={saveError}
+          errorKind={saveErrorKind}
           onGenerate={generatePassword}
           onSubmit={submitSaveSecret}
           onClose={() => setSaveTarget(null)}
+          onEnroll={() => {
+            setSaveTarget(null);
+            setShowMfa(true);
+          }}
         />
       )}
 

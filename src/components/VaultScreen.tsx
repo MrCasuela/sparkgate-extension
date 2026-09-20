@@ -88,7 +88,12 @@ export function VaultScreen({ onLogout }: VaultScreenProps) {
         />
       )}
       {tab === 'company' && (
-        <CompanyCredentialsTab items={company.items} loading={company.loading} onReveal={company.reveal} />
+        <CompanyCredentialsTab
+          items={company.items}
+          loading={company.loading}
+          onReveal={company.reveal}
+          onEnroll={() => setTab('security')}
+        />
       )}
       {tab === 'access' && <AccessLogTab entries={accessLog.entries} loading={accessLog.loading} />}
       {tab === 'security' && <MfaEnrollment />}
