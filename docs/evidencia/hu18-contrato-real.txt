@@ -1,0 +1,49 @@
+Contrato de HU18 contra el backend REAL — 2026-09-20
+=====================================================
+Qué es: src/test/contract.real.test.ts. Corre el código REAL de la extensión (src/api, src/utils,
+src/dashboard/labels) contra un sparkgate-api real en marcha con un Supabase real, sobre cuentas
+desechables (una cuenta de empresa, un trabajador, una credencial externa con contraseña conocida).
+Los códigos TOTP los genera el propio test con WebCrypto, una implementación de RFC 6238 independiente
+de la del backend (pyotp); sus vectores de prueba se comprueban en los últimos seis tests.
+
+Cómo se corrió (backend propio en :8001 con una TOTP_MASTER_KEY desechable solo en el entorno de ese
+proceso; el fixture con los tokens se generó con las funciones de aprovisionamiento de
+sparkgate-api/scripts/e2e_hu18_check.py y se destruyó después junto con las cuentas):
+
+  VITE_SPARKGATE_RUN_REAL=1 VITE_SPARKGATE_REAL_FIXTURE="$(cat fixture.json)" \
+  VITE_API_URL=http://localhost:8001 pnpm exec vitest run src/test/contract.real.test.ts --reporter=verbose
+
+Qué prueba que los mocks no pueden: que las claves de cada respuesta real coinciden EXACTAMENTE con las
+del tipo TS (el compilador rechaza la lista de claves si le sobra o le falta una), que el 403 trae `code`
+de primer nivel y la extensión lo clasifica bien, que toda acción de auditoría que el backend escribe tiene
+etiqueta, y que tras revocar el access token del trabajador responde 401 (AC5) visto desde el cliente real.
+
+Comprobado que el test PUEDE fallar: con la extensión sin leer el `code`, con no_enrolado clasificado como
+retry y con otro nombre de header, el test cae contra el backend real (3 mutaciones, 3 detectadas).
+
+Lo que NO cubre: la interfaz gráfica. Cómo se ve y se siente el QR, el modal del código y la pestaña
+«Seguridad» en Chrome real, y que una app de autenticación REAL lea el QR, quedan como pasos manuales.
+
+------------------------------------------------------------------------------------------------------
+
+ RUN  v3.2.7 /media/pablo/hdd-linux/Proyectos-Personales/sparkgate-extension
+
+ ✓ src/test/contract.real.test.ts > contrato de HU18 contra el backend real > A. sin segundo factor: el 403 trae `code`, y la extensión lo clasifica como «configurá tu factor» 839ms
+ ✓ src/test/contract.real.test.ts > contrato de HU18 contra el backend real > B. el trabajador sin factor tampoco retira lo que le asignaron 538ms
+ ✓ src/test/contract.real.test.ts > contrato de HU18 contra el backend real > C. enrolar devuelve lo que la extensión necesita para dibujar el QR, y confirmar activa el factor 2466ms
+ ✓ src/test/contract.real.test.ts > contrato de HU18 contra el backend real > D. con código: lee la credencial; el reuso y el código malo se distinguen por su `code` 11944ms
+ ✓ src/test/contract.real.test.ts > contrato de HU18 contra el backend real > E. las tres escrituras rechazadas dejan intacto el estado, y la auditoría las etiqueta con su motivo 1894ms
+ ✓ src/test/contract.real.test.ts > contrato de HU18 contra el backend real > F. revocar con código rota la contraseña y, desde la extensión, la sesión del trabajador deja de servir (AC2, AC5) 26844ms
+ ✓ src/test/contract.real.test.ts > contrato de HU18 contra el backend real > G. desactivar exige un código vigente y devuelve 204 29915ms
+ ✓ src/test/contract.real.test.ts > generador TOTP del test — vectores de RFC 6238, Apéndice B > T=59 da 94287082 1ms
+ ✓ src/test/contract.real.test.ts > generador TOTP del test — vectores de RFC 6238, Apéndice B > T=1111111109 da 07081804 1ms
+ ✓ src/test/contract.real.test.ts > generador TOTP del test — vectores de RFC 6238, Apéndice B > T=1111111111 da 14050471 1ms
+ ✓ src/test/contract.real.test.ts > generador TOTP del test — vectores de RFC 6238, Apéndice B > T=1234567890 da 89005924 0ms
+ ✓ src/test/contract.real.test.ts > generador TOTP del test — vectores de RFC 6238, Apéndice B > T=2000000000 da 69279037 0ms
+ ✓ src/test/contract.real.test.ts > generador TOTP del test — vectores de RFC 6238, Apéndice B > T=20000000000 da 65353130 1ms
+
+ Test Files  1 passed (1)
+      Tests  13 passed (13)
+   Start at  00:53:16
+   Duration  75.92s (transform 154ms, setup 142ms, collect 153ms, tests 74.45s, environment 616ms, prepare 88ms)
+
