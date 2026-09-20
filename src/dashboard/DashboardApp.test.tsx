@@ -4,15 +4,18 @@ import { describe, it, expect, vi, beforeEach } from 'vitest';
 import { DashboardApp } from './DashboardApp';
 import * as dashboardApi from '../api/dashboard';
 import * as passwordsApi from '../api/passwords';
+import * as mfaApi from '../api/mfa';
 import { setJwt, setUserId, clearAuth } from '../utils/storage';
 import { credential, member, makeJwt } from '../test/fixtures';
 import type { CredentialActionResponse } from '../types/dashboard';
 
 vi.mock('../api/dashboard');
 vi.mock('../api/passwords');
+vi.mock('../api/mfa');
 
 const api = vi.mocked(dashboardApi);
 const passwords = vi.mocked(passwordsApi);
+const mfa = vi.mocked(mfaApi);
 
 const INTERNAL = credential({ id: 'int-1', type: 'interna', service_name: 'SparkGate', supabase_user_id: 'worker-1', member_id: 'member-1' });
 const EXTERNAL = credential({ id: 'ext-1', service_name: 'Google Workspace' });
@@ -157,5 +160,30 @@ describe('DashboardApp — el panel muestra lo que devuelve el backend (B2)', ()
     expect(within(dialog).getByLabelText('Contraseña temporal')).toHaveValue('Temporal#12345678');
     expect(dialog.textContent).not.toMatch(/no se guarda en ningún lado/i);
     expect(dialog.textContent).toMatch(/guardada cifrada/);
+  });
+});
+
+describe('DashboardApp — el segundo factor propio (HU18)', () => {
+  it('el encabezado ofrece configurar el segundo factor y abre el enrolamiento', async () => {
+    mfa.getMfaStatus.mockResolvedValue({ enrolled: false, pending: false, confirmed_at: null, last_used_at: null, locked_until: null });
+    await renderPanel();
+
+    expect(screen.queryByRole('dialog', { name: 'Segundo factor de verificación' })).not.toBeInTheDocument();
+    await userEvent.click(screen.getByRole('button', { name: 'Segundo factor' }));
+
+    const dialog = await screen.findByRole('dialog', { name: 'Segundo factor de verificación' });
+    expect(await within(dialog).findByText('Configurar segundo factor')).toBeInTheDocument();
+  });
+
+  it('se cierra con «Cerrar» y no pide nada al backend hasta que se abre', async () => {
+    mfa.getMfaStatus.mockResolvedValue({ enrolled: true, pending: false, confirmed_at: '2026-09-19T12:00:00Z', last_used_at: null, locked_until: null });
+    await renderPanel();
+    expect(mfa.getMfaStatus).not.toHaveBeenCalled();
+
+    await userEvent.click(screen.getByRole('button', { name: 'Segundo factor' }));
+    await screen.findByText('Activo');
+    await userEvent.click(screen.getByText('Cerrar'));
+
+    expect(screen.queryByRole('dialog', { name: 'Segundo factor de verificación' })).not.toBeInTheDocument();
   });
 });

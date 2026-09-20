@@ -3,6 +3,7 @@ import { useAuth } from '../hooks/useAuth';
 import { useTheme } from '../hooks/useTheme';
 import { AuthScreen } from '../components/AuthScreen';
 import { LoadingSpinner } from '../components/LoadingSpinner';
+import { MfaEnrollment } from '../components/MfaEnrollment';
 import { ErrorAlert } from '../components/ErrorAlert';
 import { ApiError } from '../api/client';
 import * as dashboardApi from '../api/dashboard';
@@ -82,6 +83,8 @@ export function DashboardApp() {
   const [forbiddenDetail, setForbiddenDetail] = useState<string | null>(null);
   const [loadError, setLoadError] = useState<string | null>(null);
   const [searchQuery, setSearchQuery] = useState('');
+  // Segundo factor (HU18): configurar, activar o desactivar el propio.
+  const [showMfa, setShowMfa] = useState(false);
 
   const [pendingAction, setPendingAction] = useState<PendingAction | null>(null);
   const [confirmSubmitting, setConfirmSubmitting] = useState(false);
@@ -484,6 +487,12 @@ export function DashboardApp() {
         </h1>
         <div className="flex items-center gap-2">
           <button
+            onClick={() => setShowMfa(true)}
+            className="rounded-lg px-3 py-1.5 text-sm hover:bg-gray-100 dark:hover:bg-gray-800"
+          >
+            Segundo factor
+          </button>
+          <button
             onClick={toggleDark}
             className="rounded-lg p-2 text-sm hover:bg-gray-100 dark:hover:bg-gray-800"
             aria-label="Cambiar modo oscuro"
@@ -790,6 +799,21 @@ export function DashboardApp() {
                   : 'Ya la apliqué'}
             </button>
           </div>
+        </Modal>
+      )}
+
+      {showMfa && (
+        <Modal
+          title="Segundo factor de verificación"
+          subtitle="Se pide un código de tu app de autenticación para ver o rotar contraseñas que no son tuyas."
+        >
+          <MfaEnrollment />
+          <button
+            onClick={() => setShowMfa(false)}
+            className="mt-4 w-full rounded-lg border border-gray-300 py-2 text-sm font-semibold hover:bg-gray-100 dark:border-gray-600 dark:hover:bg-gray-800"
+          >
+            Cerrar
+          </button>
         </Modal>
       )}
 
