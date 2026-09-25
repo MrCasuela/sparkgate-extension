@@ -1,6 +1,8 @@
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import type { Credential } from '../types/dashboard';
-import { ErrorAlert } from '../components/ErrorAlert';
+import { StepUpAlert } from '../components/StepUpAlert';
+import { TotpCodeField } from '../components/TotpCodeField';
+import { isCompleteTotp, type StepUpKind } from '../utils/stepUp';
 import { MAX_PASSWORD_LENGTH, MIN_PASSWORD_LENGTH } from './labels';
 import { Modal } from './Modal';
 
@@ -12,9 +14,12 @@ interface ConfirmActionModalProps {
   credential: Credential;
   submitting: boolean;
   error: string | null;
-  /** customPassword undefined = que el backend genere la contraseña. */
-  onConfirm: (customPassword?: string) => void;
+  /** Por qué falló, si fue el segundo factor: `enroll` ofrece configurarlo en vez de decir «código incorrecto». */
+  errorKind?: StepUpKind | null;
+  /** customPassword undefined = que el backend genere la contraseña. `code` es el del segundo factor (HU18). */
+  onConfirm: (customPassword: string | undefined, code: string) => void;
   onClose: () => void;
+  onEnroll?: () => void;
 }
 
 /**
@@ -29,22 +34,26 @@ export function ConfirmActionModal({
   credential,
   submitting,
   error,
+  errorKind,
   onConfirm,
   onClose,
+  onEnroll,
 }: ConfirmActionModalProps) {
   const [custom, setCustom] = useState('');
+  const [code, setCode] = useState('');
   const tooShort = custom.length > 0 && custom.length < MIN_PASSWORD_LENGTH;
+
+  // Un código rechazado no sirve de nuevo (el backend lo cuenta como reutilizado): no se deja escrito.
+  useEffect(() => {
+    if (error) setCode('');
+  }, [error]);
 
   return (
     <Modal
       title={kind === 'revoke' ? 'Revocar acceso' : 'Generar sugerencia'}
       subtitle={`${memberName} — ${credential.service_name}`}
     >
-      {error && (
-        <div className="mb-3">
-          <ErrorAlert message={error} />
-        </div>
-      )}
+      {error && <StepUpAlert message={error} kind={errorKind} onEnroll={onEnroll} />}
 
       <p className="mb-3 text-sm">
         {kind === 'revoke'
@@ -67,6 +76,14 @@ export function ConfirmActionModal({
       />
       {tooShort && <p className="mb-2 text-xs text-alert">Mínimo {MIN_PASSWORD_LENGTH} caracteres.</p>}
 
+      <div className="mt-3">
+        <TotpCodeField id="confirm-totp" value={code} onChange={setCode} disabled={submitting} />
+        <p className="text-xs text-gray-500 dark:text-gray-400">
+          {kind === 'revoke' ? 'Revocar' : 'Sugerir'} una contraseña pide tu segundo factor. Cada código sirve una sola
+          vez: si acabás de usar uno, esperá al siguiente.
+        </p>
+      </div>
+
       <div className="mt-4 flex gap-2">
         <button
           onClick={onClose}
@@ -76,8 +93,8 @@ export function ConfirmActionModal({
           Cancelar
         </button>
         <button
-          onClick={() => onConfirm(custom || undefined)}
-          disabled={submitting || tooShort}
+          onClick={() => onConfirm(custom || undefined, code)}
+          disabled={submitting || tooShort || !isCompleteTotp(code)}
           className="flex-1 rounded-lg bg-primary py-2 text-sm font-semibold text-white hover:opacity-90 disabled:cursor-not-allowed disabled:opacity-50"
         >
           {submitting ? 'Confirmando...' : 'Confirmar'}

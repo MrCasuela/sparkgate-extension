@@ -64,11 +64,37 @@ Todos los body son JSON. Solicitudes autenticadas usan `Authorization: Bearer`
 | GET | `/api/v1/dashboard/members` | JWT empresa | — |
 | POST | `/api/v1/dashboard/members` | JWT empresa | JSON |
 | GET | `/api/v1/dashboard/audit-log` | JWT empresa | — |
-| POST | `/api/v1/dashboard/credentials/{id}/revoke` | JWT empresa | JSON |
-| POST | `/api/v1/dashboard/credentials/{id}/suggest` | JWT empresa | JSON |
+| POST | `/api/v1/dashboard/credentials/{id}/revoke` | JWT empresa + **TOTP** | JSON |
+| POST | `/api/v1/dashboard/credentials/{id}/suggest` | JWT empresa + **TOTP** | JSON |
 | POST | `/api/v1/dashboard/credentials/{id}/restore` | JWT empresa | — |
 | GET | `/api/v1/dashboard/members/{id}/vault` | JWT empresa | — |
-| POST | `/api/v1/dashboard/members/{mid}/vault/{iid}/reveal` | JWT empresa | — |
+| POST | `/api/v1/dashboard/members/{mid}/vault/{iid}/reveal` | JWT empresa + **TOTP** | — |
+| PUT | `/api/v1/dashboard/credentials/{id}/secret` | JWT empresa + **TOTP** | JSON |
+| POST | `/api/v1/dashboard/credentials/{id}/secret/reveal` | JWT empresa + **TOTP** | — |
+| GET | `/api/v1/me/credentials` | JWT | — |
+| POST | `/api/v1/me/credentials/{id}/reveal` | JWT + **TOTP** | — |
+| GET | `/api/v1/me/mfa` | JWT | — |
+| POST | `/api/v1/me/mfa/enroll` | JWT | — |
+| POST | `/api/v1/me/mfa/confirm` | JWT + código | — |
+| DELETE | `/api/v1/me/mfa` | JWT + código | — |
+
+### Segundo factor (HU18)
+
+Ver o rotar una contraseña que **no es tuya** pide un código TOTP de 6 dígitos (el mismo que muestra
+Google Authenticator o Authy), enviado en el header `X-SparkGate-TOTP`. Son las seis filas marcadas
+**TOTP**; incluye al trabajador que retira la credencial que su empresa le asignó, porque ese secreto
+es de la organización.
+
+- **Configurarlo:** botón «Segundo factor» en el panel de administración, o pestaña «Seguridad» de la
+  bóveda. Se escanea un QR (dibujado en la extensión a partir del `otpauth://` que devuelve el
+  backend) y se confirma con el primer código. El secreto se muestra una sola vez y no se guarda.
+- **Si el backend rechaza el código** (`403` con un `code`), el modal lo dice sin cerrarse:
+  `totp_no_enrolado` ofrece configurar el factor; `totp_invalido`, `totp_reutilizado` y
+  `totp_bloqueado` piden de nuevo o esperar. Cada código sirve **una sola vez**.
+- **Auditoría:** los intentos rechazados quedan en el registro del panel con su motivo, y el trabajador
+  ve el ciclo de vida de su propio factor en «Accesos».
+- Contrato verificado contra el backend real: `docs/evidencia/hu18-contrato-real.txt`
+  (`src/test/contract.real.test.ts`, apagado por defecto; ver el comentario del archivo).
 
 ## Superficies de UI
 
@@ -83,7 +109,8 @@ Popup (index.html, 360×500px)
 
 Dashboard (dashboard.html, pestaña completa — solo cuentas de empresa)
 ├── Lista de miembros y credenciales (interna/externa, estado)
-└── Audit log + export CSV
+├── Botón «Segundo factor» (configurar / desactivar el propio)
+└── Audit log + export CSV (con el motivo de los intentos rechazados)
 ```
 
 ## Especificación

@@ -1,7 +1,8 @@
-import { render, screen } from '@testing-library/react';
+import { render, screen, waitFor } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { describe, it, expect, vi } from 'vitest';
 import { CompanyCredentialsTab } from './CompanyCredentialsTab';
+import { ApiError } from '../api/client';
 import type { AssignedCredential } from '../types/me';
 import type { CredentialSecret } from '../types/dashboard';
 
@@ -43,23 +44,65 @@ describe('CompanyCredentialsTab', () => {
     expect(screen.getByText(/la empresa lo ve en su registro/)).toBeInTheDocument();
   });
 
-  it('la contraseña solo se pide al presionar «Ver contraseña», no al listar', async () => {
+  it('la contraseña solo se pide con el código del segundo factor, no al listar ni al presionar el botón', async () => {
     const onReveal = vi.fn().mockResolvedValue(SECRET);
     render(<CompanyCredentialsTab items={[assigned()]} loading={false} onReveal={onReveal} />);
     expect(onReveal).not.toHaveBeenCalled();
 
     await userEvent.click(screen.getByText('Ver contraseña'));
+    // Presionar el botón NO pide nada: abre el modal del código (V13: el secreto se pide on-demand).
+    expect(onReveal).not.toHaveBeenCalled();
+    expect(screen.getByRole('dialog', { name: 'Ver contraseña' })).toBeInTheDocument();
 
-    expect(onReveal).toHaveBeenCalledWith('c1');
+    await userEvent.type(screen.getByLabelText(/código de tu app/i), '123456');
+    await userEvent.click(screen.getByText('Continuar'));
+
+    await waitFor(() => expect(onReveal).toHaveBeenCalledWith('c1', '123456'));
     expect(await screen.findByLabelText('Contraseña de Google Workspace')).toHaveValue('Clave-De-La-Empresa#1');
     expect(screen.getByText('Ocultar')).toBeInTheDocument();
+    expect(screen.queryByRole('dialog')).not.toBeInTheDocument();
   });
 
-  it('si el backend la niega (null) no se muestra nada', async () => {
-    const onReveal = vi.fn().mockResolvedValue(null);
+  it('si el backend rechaza el código, no se muestra nada y el motivo se ve en el modal', async () => {
+    const onReveal = vi
+      .fn()
+      .mockRejectedValue(new ApiError(403, 'El código de verificación no es válido o ya expiró.', 'totp_invalido'));
     render(<CompanyCredentialsTab items={[assigned()]} loading={false} onReveal={onReveal} />);
+
     await userEvent.click(screen.getByText('Ver contraseña'));
+    await userEvent.type(screen.getByLabelText(/código de tu app/i), '000000');
+    await userEvent.click(screen.getByText('Continuar'));
+
+    expect(await screen.findByText(/no es válido o ya expiró/)).toBeInTheDocument();
     expect(screen.queryByLabelText(/Contraseña de/)).toBeNull();
+    expect(screen.getByRole('dialog')).toBeInTheDocument();
+  });
+
+  it('un trabajador sin factor configurado es llevado a configurarlo, no se le dice «código incorrecto»', async () => {
+    const onEnroll = vi.fn();
+    const onReveal = vi
+      .fn()
+      .mockRejectedValue(new ApiError(403, 'Esta operación requiere un segundo factor y tu cuenta no tiene uno configurado.', 'totp_no_enrolado'));
+    render(<CompanyCredentialsTab items={[assigned()]} loading={false} onReveal={onReveal} onEnroll={onEnroll} />);
+
+    await userEvent.click(screen.getByText('Ver contraseña'));
+    await userEvent.type(screen.getByLabelText(/código de tu app/i), '123456');
+    await userEvent.click(screen.getByText('Continuar'));
+    await userEvent.click(await screen.findByText('Configurar segundo factor'));
+
+    expect(onEnroll).toHaveBeenCalledTimes(1);
+  });
+
+  it('un 403 que NO es del segundo factor (tu cuenta fue revocada) se muestra tal cual y no ofrece configurar nada', async () => {
+    const onReveal = vi.fn().mockRejectedValue(new ApiError(403, 'Tu acceso a la organización fue revocado.'));
+    render(<CompanyCredentialsTab items={[assigned()]} loading={false} onReveal={onReveal} onEnroll={vi.fn()} />);
+
+    await userEvent.click(screen.getByText('Ver contraseña'));
+    await userEvent.type(screen.getByLabelText(/código de tu app/i), '123456');
+    await userEvent.click(screen.getByText('Continuar'));
+
+    expect(await screen.findByText('Tu acceso a la organización fue revocado.')).toBeInTheDocument();
+    expect(screen.queryByText('Configurar segundo factor')).not.toBeInTheDocument();
   });
 
   it('una credencial que no está activa no ofrece retirarla', () => {

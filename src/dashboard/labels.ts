@@ -29,7 +29,33 @@ export const ACTION_LABEL: Record<string, string> = {
   consultar_secreto: 'Vio la contraseña de una cuenta',
   consultar_secreto_denegado: 'Intento fallido de ver una contraseña',
   consultar_secreto_asignado: 'Un integrante retiró su credencial asignada',
+  // HU18: el segundo factor rechazó la operación. Hoy el backend las escribe con `denied_reason`.
+  revocar_interna_denegado: 'Intento fallido de revocar un acceso',
+  sugerir_externa_denegado: 'Intento fallido de generar una sugerencia',
+  guardar_secreto_denegado: 'Intento fallido de guardar una contraseña',
 };
+
+/** Por qué se rechazó (payload->>'denied_reason' en dashboard_audit_log). Siempre un identificador, nunca un código. */
+export const DENIED_REASON_LABEL: Record<string, string> = {
+  totp_no_enrolado: 'no tenía un segundo factor configurado',
+  totp_invalido: 'código incorrecto, ausente o vencido',
+  totp_reutilizado: 'el código ya se había usado',
+  totp_bloqueado: 'cuenta bloqueada por intentos fallidos',
+  integridad: 'la credencial no pasó la verificación de integridad',
+};
+
+/** El motivo legible de un rechazo, o null si la entrada no fue rechazada. Un motivo desconocido se muestra tal cual. */
+export function deniedReasonLabel(reason: string | null | undefined): string | null {
+  if (!reason) return null;
+  return DENIED_REASON_LABEL[reason] ?? reason;
+}
+
+/** «Intento fallido de revocar un acceso» + su motivo, cuando lo hay. */
+export function auditActionLabel(entry: { action: string; denied_reason?: string | null }): string {
+  const label = ACTION_LABEL[entry.action] ?? entry.action;
+  const reason = deniedReasonLabel(entry.denied_reason);
+  return reason ? `${label} — ${reason}` : label;
+}
 
 export const MIN_PASSWORD_LENGTH = 12;
 export const MAX_PASSWORD_LENGTH = 64;

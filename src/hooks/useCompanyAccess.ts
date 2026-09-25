@@ -1,7 +1,6 @@
 import { useCallback, useState } from 'react';
 import * as meApi from '../api/me';
 import * as vaultApi from '../api/vault';
-import { ApiError } from '../api/client';
 import type { CredentialSecret } from '../types/dashboard';
 import type { AssignedCredential } from '../types/me';
 import type { VaultAuditEntry } from '../types/vault';
@@ -28,19 +27,18 @@ export function useCompanyCredentials() {
     }
   }, []);
 
-  const reveal = useCallback(async (credentialId: string): Promise<CredentialSecret | null> => {
-    setError(null);
-    try {
-      return await meApi.revealAssignedCredential(credentialId);
-    } catch (e: unknown) {
-      // 403 (ya no está activa para vos), 404 (no es tuya o no tiene contraseña) y 503
-      // (módulo caído) traen un detail pensado para mostrarse tal cual.
-      setError(
-        e instanceof ApiError ? e.detail : errorMessage(e, 'Error al retirar la contraseña'),
-      );
-      return null;
-    }
-  }, []);
+  /**
+   * Retira una credencial de la organización con el código del segundo factor (HU18). NO atrapa el
+   * error: lo muestra el modal que pidió el código, dentro de sí mismo y con el `code` del backend
+   * a mano para distinguir «configurá tu factor» de «el código está mal». Un banner de la pestaña
+   * lo perdería de vista. Los 403 (ya no está activa para vos), 404 y 503 traen un detail pensado
+   * para mostrarse tal cual.
+   */
+  const reveal = useCallback(
+    (credentialId: string, code: string): Promise<CredentialSecret> =>
+      meApi.revealAssignedCredential(credentialId, code),
+    [],
+  );
 
   const clearError = useCallback(() => setError(null), []);
 

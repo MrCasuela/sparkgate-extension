@@ -5,16 +5,18 @@ import { SaveCredentialTab } from './SaveCredentialTab';
 import { CredentialListTab } from './CredentialListTab';
 import { CompanyCredentialsTab } from './CompanyCredentialsTab';
 import { AccessLogTab } from './AccessLogTab';
+import { MfaEnrollment } from './MfaEnrollment';
 import { DangerZone } from './DangerZone';
 import { ErrorAlert } from './ErrorAlert';
 
-type InnerTab = 'save' | 'list' | 'company' | 'access';
+type InnerTab = 'save' | 'list' | 'company' | 'access' | 'security';
 
 const TABS: { id: InnerTab; label: string; title: string }[] = [
   { id: 'save', label: 'Guardar', title: 'Guardar una credencial' },
   { id: 'list', label: 'Mías', title: 'Mis credenciales' },
   { id: 'company', label: 'Empresa', title: 'Cuentas que te asignó tu empresa' },
   { id: 'access', label: 'Accesos', title: 'Quién accedió a tu bóveda' },
+  { id: 'security', label: 'Seguridad', title: 'Segundo factor de verificación' },
 ];
 
 interface VaultScreenProps {
@@ -86,9 +88,15 @@ export function VaultScreen({ onLogout }: VaultScreenProps) {
         />
       )}
       {tab === 'company' && (
-        <CompanyCredentialsTab items={company.items} loading={company.loading} onReveal={company.reveal} />
+        <CompanyCredentialsTab
+          items={company.items}
+          loading={company.loading}
+          onReveal={company.reveal}
+          onEnroll={() => setTab('security')}
+        />
       )}
       {tab === 'access' && <AccessLogTab entries={accessLog.entries} loading={accessLog.loading} />}
+      {tab === 'security' && <MfaEnrollment />}
 
       <DangerZone onPurge={vault.purgeAll} onLogout={onLogout} />
     </div>

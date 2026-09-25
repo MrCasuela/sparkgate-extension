@@ -1,4 +1,5 @@
 import { useState } from 'react';
+import { useStepUpPrompt } from '../hooks/useStepUpPrompt';
 import { LoadingSpinner } from './LoadingSpinner';
 import type { CredentialSecret } from '../types/dashboard';
 import type { AssignedCredential } from '../types/me';
@@ -6,7 +7,10 @@ import type { AssignedCredential } from '../types/me';
 interface CompanyCredentialsTabProps {
   items: AssignedCredential[];
   loading: boolean;
-  onReveal: (credentialId: string) => Promise<CredentialSecret | null>;
+  /** Retira la contraseña con el código del segundo factor. Lanza si el backend lo rechaza. */
+  onReveal: (credentialId: string, code: string) => Promise<CredentialSecret>;
+  /** Lleva a configurar el segundo factor cuando la cuenta no tiene uno. */
+  onEnroll?: () => void;
 }
 
 /**
@@ -14,16 +18,22 @@ interface CompanyCredentialsTabProps {
  * lectura: no las edita ni las borra. Retirar una contraseña queda registrado en
  * la auditoría de la empresa, y acá se avisa antes de que lo haga por sorpresa.
  */
-export function CompanyCredentialsTab({ items, loading, onReveal }: CompanyCredentialsTabProps) {
+export function CompanyCredentialsTab({ items, loading, onReveal, onEnroll }: CompanyCredentialsTabProps) {
   const [revealed, setRevealed] = useState<Record<string, CredentialSecret>>({});
-  const [loadingId, setLoadingId] = useState<string | null>(null);
   const [copiedId, setCopiedId] = useState<string | null>(null);
+  const stepUp = useStepUpPrompt(onEnroll);
 
-  const handleReveal = async (id: string) => {
-    setLoadingId(id);
-    const secret = await onReveal(id);
-    setLoadingId(null);
-    if (secret) setRevealed((prev) => ({ ...prev, [id]: secret }));
+  // Retirar una contraseña que es de la ORGANIZACIÓN pide el segundo factor del trabajador (HU18).
+  const handleReveal = (item: AssignedCredential) => {
+    stepUp.ask({
+      title: 'Ver contraseña',
+      subtitle: `${item.service_name} — ${item.organization_name}`,
+      description: 'Es una cuenta de tu empresa: retirarla queda registrado en su auditoría. Confirmá con tu segundo factor.',
+      run: async (code) => {
+        const secret = await onReveal(item.id, code);
+        setRevealed((prev) => ({ ...prev, [item.id]: secret }));
+      },
+    });
   };
 
   const handleHide = (id: string) => {
@@ -86,11 +96,10 @@ export function CompanyCredentialsTab({ items, loading, onReveal }: CompanyCrede
                 </button>
               ) : canReveal ? (
                 <button
-                  onClick={() => handleReveal(item.id)}
-                  disabled={loadingId === item.id}
-                  className="rounded-lg px-2 py-1 text-xs text-primary hover:bg-primary/10 disabled:opacity-50"
+                  onClick={() => handleReveal(item)}
+                  className="rounded-lg px-2 py-1 text-xs text-primary hover:bg-primary/10"
                 >
-                  {loadingId === item.id ? <LoadingSpinner small /> : 'Ver contraseña'}
+                  Ver contraseña
                 </button>
               ) : (
                 <span className="text-xs italic text-gray-500 dark:text-gray-400">
@@ -122,6 +131,7 @@ export function CompanyCredentialsTab({ items, loading, onReveal }: CompanyCrede
           </div>
         );
       })}
+      {stepUp.modal}
     </div>
   );
 }
